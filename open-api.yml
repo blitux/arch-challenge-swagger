@@ -168,7 +168,8 @@ paths:
         - name: locked_at
           in: query
           schema:
-            type: timestamp
+            type: string
+            format: timestamp
         - name: assigned
           in: query
           schema:
