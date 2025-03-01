@@ -6,6 +6,7 @@ info:
 paths:
   /coupon-books:
     get:
+      tags: ["Coupon Books"]
       summary: Retrieve a list of coupon books with optional filters
       operationId: getCouponBooks
       security:
@@ -75,12 +76,11 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CouponBook"
+                $ref: "#/components/schemas/CouponBookGetResponse"
         "400":
           description: "Bad Request"
     post:
+      tags: ["Coupon Books"]
       summary: Create a new coupon book
       operationId: createCouponBook
       security:
@@ -103,6 +103,7 @@ paths:
 
   /coupon-book/{coupon_book_id}:
     get:
+      tags: ["Coupon Books"]
       summary: Get the detail of a coupon book
       operationId: getCouponBook
       parameters:
@@ -116,7 +117,7 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: List of coupon books retrieved successfully
+          description: Coupon book details retrieved successfully
           content:
             application/json:
               schema:
@@ -124,6 +125,7 @@ paths:
 
   /coupon-book/{coupon_book_id}/codes:
     post:
+      tags: ["Coupon Books"]
       summary: Upload a code list to an existing Coupon Book
       description: "Coupon list consist of a csv file with the following format: "
       operationId: uploadCodeList
@@ -135,6 +137,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -145,8 +148,50 @@ paths:
         "200":
           description: Codes uploaded successfully
 
-  /coupons/assign:
+  /coupons:
+    get:
+      tags: ["Coupons"]
+      summary: Retrieve a list of coupon with optional filters
+      operationId: getCoupons
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: client_id
+          in: query
+          schema:
+            type: string
+            description: Filter by client ID
+        - name: redeemed
+          in: query
+          schema:
+            type: boolean
+        - name: locked_at
+          in: query
+          schema:
+            type: timestamp
+        - name: assigned
+          in: query
+          schema:
+            type: boolean
+        - name: coupon_book_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of coupon retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponGetResponse"
+
+        "400":
+          description: "Bad Request"
+
+  /coupons/assign-random:
     post:
+      tags: ["Coupons"]
       summary: Assign a new random coupon code to a user
       operationId: assignRandomCoupon
       security:
@@ -160,15 +205,46 @@ paths:
       responses:
         "200":
           description: Coupon assigned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                concurrencyError:
+                  value:
+                    message: "Unable to assign coupon due to concurrency issues, please retry"
+        "422":
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                expiredCouponBook:
+                  value:
+                    message: "Coupon book is expired or not yet available"
+                maxCoupons:
+                  value:
+                    message: "Max coupons per member reached as stated by coupon book config."
+                noCoupons:
+                  value:
+                    message: "No coupons available on the coupon book"
 
-  /coupons/assign/{code}:
+  /coupons/{coupon_code}/assign:
     post:
+      tags: ["Coupons"]
       summary: Assign a given coupon code to a user
       operationId: assignSpecificCoupon
       security:
         - BearerAuth: []
       parameters:
-        - name: code
+        - name: coupon_code
           in: path
           required: true
           schema:
@@ -182,15 +258,43 @@ paths:
       responses:
         "200":
           description: Coupon assigned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                alreadyAssigned:
+                  value:
+                    message: "Coupon was already assigned"
+        "422":
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                expiredCouponBook:
+                  value:
+                    message: "Coupon book is expired or not yet available"
+                maxCoupons:
+                  value:
+                    message: "Max coupons per member reached as stated by coupon book config."
 
-  /coupons/lock/{code}:
+  /coupons/{coupon_code}/lock:
     post:
+      tags: ["Coupons"]
       summary: Lock a coupon for redemption
       operationId: lockCoupon
       security:
         - BearerAuth: []
       parameters:
-        - name: code
+        - name: coupon_code
           in: path
           required: true
           schema:
@@ -204,15 +308,49 @@ paths:
       responses:
         "200":
           description: Coupon locked successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                alreadyLocked:
+                  value:
+                    message: "Coupon was already locked while trying to lock it"
+        "422":
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                notAssigned:
+                  value:
+                    message: "Unable to redeem as coupon was not assigned to a member"
+                alreadyRedeemed:
+                  value:
+                    message: "Unable to lock as coupon was already redeemed"
+                locked:
+                  value:
+                    message: "Coupon already locked"
+                expired:
+                  value:
+                    message: "Coupon book is expired or not yet available"
 
-  /coupons/redeem/{code}:
+  /coupons/{coupon_code}/redeem:
     post:
+      tags: ["Coupons"]
       summary: Redeem a coupon
       operationId: redeemCoupon
       security:
         - BearerAuth: []
       parameters:
-        - name: code
+        - name: coupon_code
           in: path
           required: true
           schema:
@@ -226,6 +364,39 @@ paths:
       responses:
         "200":
           description: Coupon redeemed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                serializationError:
+                  value:
+                    message: "Coupon was not redeemed (serialization error)"
+        "422":
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                notAssigned:
+                  value:
+                    message: "Unable to redeem as coupon was not assigned to a member"
+                alreadyRedeemed:
+                  value:
+                    message: "Coupon is already redeemed"
+                notLocked:
+                  value:
+                    message: "Coupon is not locked, cannot be redeemed"
+                expired:
+                  value:
+                    message: "Coupon is expired or not yet available"
 
 components:
   securitySchemes:
@@ -272,8 +443,106 @@ components:
         updated_at:
           type: string
           format: date-time
+    CouponGetResponse:
+      type: object
+      properties:
+        limit:
+          type: integer
+          example: 20
+        offset:
+          type: integer
+          example: 20
+        total:
+          type: integer
+        page:
+          type: integer
+          example: 1
+        total_pages:
+          type: integer
+        prev:
+          type: string
+          example: /coupon-books?limit=20&offset=0
+        next:
+          type: string
+          example: /coupon-books?limit=20&offset=40
+        data:
+          type: array
+          description: list of coupon books
+          items:
+            $ref: "#/components/schemas/Coupon"
+    Coupon:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Coupon ID
+        code:
+          type: string
+          description: Coupon code
+        coupon_book_id:
+          type: string
+          format: uuid
+          description: ID of the coupon book this coupon belongs to
+        member_id:
+          type: string
+          format: uuid
+          description: Member ID to whom the coupon is assigned
+        status:
+          type: string
+          enum: [available, assigned, locked, redeemed]
+          description: Current status of the coupon
+        redemption_count:
+          type: integer
+          description: Number of times this coupon has been redeemed
+        locked_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the coupon was locked
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CouponBookGetResponse:
+      type: object
+      properties:
+        limit:
+          type: integer
+          example: 20
+        offset:
+          type: integer
+          example: 20
+        total:
+          type: integer
+        page:
+          type: integer
+          example: 1
+        total_pages:
+          type: integer
+        prev:
+          type: string
+          example: /coupon-books?limit=20&offset=0
+        next:
+          type: string
+          example: /coupon-books?limit=20&offset=40
+        data:
+          type: array
+          description: list of coupon books
+          items:
+            $ref: "#/components/schemas/CouponBook"
     CreateCouponBookRequest:
       type: object
+      required:
+        - name
+        - client_id
+        - max_coupons_per_member
+        - valid_from
+        - valid_to
+        - discount_type
+        - discount_value
       properties:
         name:
           type: string
@@ -283,6 +552,7 @@ components:
           description: Id of the client associated with the coupon book
         max_redemptions_per_coupon:
           type: integer
+          default: 1
           description: How many times a member can redeem a particular coupon
         max_coupons_per_member:
           type: integer
@@ -300,57 +570,68 @@ components:
           type: integer
         enabled:
           type: boolean
+          default: false
+        generate_coupons_amount:
+          type: integer
+          description: Amount of coupons to generate
+          example: 1000
+        generate_coupons_format:
+          type: string
+          example: "[A-Z]{3}-[0-9]{3}"
+          description: Format of the coupons in a RegExp like string
     UploadCodeListRequest:
       type: object
+      required:
+        - file
       properties:
-        coupon_book_id:
-          type: string
-          format: uuid
         file:
           type: string
           format: binary
           description: "A csv file with the coupons to upload"
     AssignRandomCouponRequest:
       type: object
+      required:
+        - coupon_book_id
+        - member_id
       properties:
         coupon_book_id:
           type: string
           format: uuid
           description: Coupon book ID
-        coupon_code_format:
-          type: string
-          description: A regex-like string to be used as a template for the coupon code generation
-        name:
-          type: string
-          description: Coupon system name
-        display_name:
-          type: string
-          description: Coupon display name
         member_id:
           type: string
           format: uuid
           description: Member ID to whom the coupon will be assigned
-        discount_percent:
-          type: integer
-          description: Discount percent of the coupon.
-        discount_amount:
-          type: integer
-          description: Discount amount
     AssignSpecificCouponRequest:
       type: object
+      required:
+        - member_id
       properties:
-        coupon_id:
+        member_id:
           type: string
-          description: Coupon ID
+          format: uuid
+          description: Member ID to whom the coupon will be assigned
     LockCouponRequest:
       type: object
+      required:
+        - member_id
       properties:
-        coupon_id:
+        member_id:
           type: string
-          description: Coupon ID
+          format: uuid
+          description: Member ID who is attempting to lock the coupon
     RedeemCouponRequest:
       type: object
+      required:
+        - member_id
       properties:
-        coupon_id:
+        member_id:
           type: string
-          description: Coupon ID
+          format: uuid
+          description: Member ID who is redeeming the coupon
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
