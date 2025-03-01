@@ -1,0 +1,356 @@
+openapi: 3.0.3
+info:
+  title: Coupon Service API
+  version: 1.0.0
+
+paths:
+  /coupon-books:
+    get:
+      summary: Retrieve a list of coupon books with optional filters
+      operationId: getCouponBooks
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filter by coupon book name
+        - name: client_id
+          in: query
+          schema:
+            type: string
+          description: Filter by client ID
+        - name: max_redemptions_per_coupon
+          in: query
+          schema:
+            type: integer
+          description: Filter by max redemptions per coupon
+        - name: max_coupons_per_member
+          in: query
+          schema:
+            type: integer
+          description: Filter by max coupons per member
+        - name: valid_from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter by valid from date
+        - name: valid_to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter by valid to date
+        - name: discount_type
+          in: query
+          schema:
+            type: string
+            enum: [percentage, amount]
+          description: Filter by discount type
+        - name: discount_value
+          in: query
+          schema:
+            type: integer
+          description: Filter by discount value
+        - name: enabled
+          in: query
+          schema:
+            type: boolean
+          description: Filter by enabled status
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of coupon books retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CouponBook"
+        "400":
+          description: "Bad Request"
+    post:
+      summary: Create a new coupon book
+      operationId: createCouponBook
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCouponBookRequest"
+      responses:
+        "201":
+          description: Coupon book created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponBook"
+        "400":
+          description: "Bad Request"
+
+  /coupon-book/{coupon_book_id}:
+    get:
+      summary: Get the detail of a coupon book
+      operationId: getCouponBook
+      parameters:
+        - name: coupon_book_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of coupon books retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponBook"
+
+  /coupon-book/{coupon_book_id}/codes:
+    post:
+      summary: Upload a code list to an existing Coupon Book
+      description: "Coupon list consist of a csv file with the following format: "
+      operationId: uploadCodeList
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: coupon_book_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadCodeListRequest"
+      responses:
+        "200":
+          description: Codes uploaded successfully
+
+  /coupons/assign:
+    post:
+      summary: Assign a new random coupon code to a user
+      operationId: assignRandomCoupon
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignRandomCouponRequest"
+      responses:
+        "200":
+          description: Coupon assigned successfully
+
+  /coupons/assign/{code}:
+    post:
+      summary: Assign a given coupon code to a user
+      operationId: assignSpecificCoupon
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignSpecificCouponRequest"
+      responses:
+        "200":
+          description: Coupon assigned successfully
+
+  /coupons/lock/{code}:
+    post:
+      summary: Lock a coupon for redemption
+      operationId: lockCoupon
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LockCouponRequest"
+      responses:
+        "200":
+          description: Coupon locked successfully
+
+  /coupons/redeem/{code}:
+    post:
+      summary: Redeem a coupon
+      operationId: redeemCoupon
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RedeemCouponRequest"
+      responses:
+        "200":
+          description: Coupon redeemed successfully
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CouponBook:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Coupon Book ID
+        name:
+          type: string
+          description: Coupon book name
+        client_id:
+          type: string
+          description: Id of the client associated with the coupon book
+        max_redemptions_per_coupon:
+          type: integer
+          description: How many times a member can redeem a particular coupon
+        max_coupons_per_member:
+          type: integer
+          description: How many coupons from the current coupon book can be assigned to a member
+        valid_from:
+          type: string
+          format: date-time
+        valid_to:
+          type: string
+          format: date-time
+        discount_type:
+          type: string
+          enum: [percentage, amount]
+        discount_value:
+          type: integer
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateCouponBookRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Coupon book name
+        client_id:
+          type: string
+          description: Id of the client associated with the coupon book
+        max_redemptions_per_coupon:
+          type: integer
+          description: How many times a member can redeem a particular coupon
+        max_coupons_per_member:
+          type: integer
+          description: How many coupons from the current coupon book can be assigned to a member
+        valid_from:
+          type: string
+          format: date-time
+        valid_to:
+          type: string
+          format: date-time
+        discount_type:
+          type: string
+          enum: [percentage, amount]
+        discount_value:
+          type: integer
+        enabled:
+          type: boolean
+    UploadCodeListRequest:
+      type: object
+      properties:
+        coupon_book_id:
+          type: string
+          format: uuid
+        file:
+          type: string
+          format: binary
+          description: "A csv file with the coupons to upload"
+    AssignRandomCouponRequest:
+      type: object
+      properties:
+        coupon_book_id:
+          type: string
+          format: uuid
+          description: Coupon book ID
+        coupon_code_format:
+          type: string
+          description: A regex-like string to be used as a template for the coupon code generation
+        name:
+          type: string
+          description: Coupon system name
+        display_name:
+          type: string
+          description: Coupon display name
+        member_id:
+          type: string
+          format: uuid
+          description: Member ID to whom the coupon will be assigned
+        discount_percent:
+          type: integer
+          description: Discount percent of the coupon.
+        discount_amount:
+          type: integer
+          description: Discount amount
+    AssignSpecificCouponRequest:
+      type: object
+      properties:
+        coupon_id:
+          type: string
+          description: Coupon ID
+    LockCouponRequest:
+      type: object
+      properties:
+        coupon_id:
+          type: string
+          description: Coupon ID
+    RedeemCouponRequest:
+      type: object
+      properties:
+        coupon_id:
+          type: string
+          description: Coupon ID
